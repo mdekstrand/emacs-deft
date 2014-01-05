@@ -579,6 +579,21 @@ is the complete regexp."
       (setq file (replace-regexp-in-string (concat "\." deft-extension "$") "" file)))
   file)
 
+(defun deft-walk-directory (dir func &optional match)
+  "Recursively walk the directory `dir', passing each absolute
+path name of a regular file (or symlink) to the function `func'.
+`match', if non-nil, is a regular expression to select the wanted
+regular files used to filter file names (but not directory
+names)."
+  (dolist (file (directory-files dir))
+    (let ((path (concat (file-name-as-directory dir) file)))
+      (cond
+       ((equal ?\. (elt file 0)) nil)
+       ((file-directory-p path)
+        (deft-walk-directory path func match))
+       ((or (null match) (string-match-p match path))
+        (funcall func path))))))
+
 (defun deft-find-all-files ()
   "Return a list of all files in the Deft directory.
 
@@ -588,16 +603,12 @@ for the various hash tables used for storing file metadata and
 contents.  So, any functions looking up values in these hash
 tables should use `expand-file-name' on filenames first."
   (if (file-exists-p deft-directory)
-      (let (files result)
-        ;; List all files
-        (setq files
-              (directory-files deft-directory t
-                               (concat "\." deft-extension "$") t))
-        ;; Filter out files that are not readable or are directories
-        (dolist (file files)
-          (when (and (file-readable-p file)
-                     (not (file-directory-p file)))
-            (setq result (cons file result))))
+      (let (result
+            (filter (concat "\." deft-extension "$")))
+        (deft-walk-directory
+          deft-directory
+          '(lambda (file) (setq result (cons file result)))
+          filter)
         result)))
 
 (defun deft-strip-title (title)
